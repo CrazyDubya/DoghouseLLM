@@ -11,6 +11,9 @@
 		7FC996AF2B5A45B6004AAFF5 /* DoghouseLLM.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7FC996A42B5A45B6004AAFF5 /* DoghouseLLM.framework */; };
 		7FC996B42B5A45B6004AAFF5 /* DoghouseLLMTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC996B32B5A45B6004AAFF5 /* DoghouseLLMTests.swift */; };
 		7FC996B52B5A45B6004AAFF5 /* DoghouseLLM.h in Headers */ = {isa = PBXBuildFile; fileRef = 7FC996A72B5A45B6004AAFF5 /* DoghouseLLM.h */; settings = {ATTRIBUTES = (Public, ); }; };
+		7FC996C12B5A464B004AAFF5 /* WebKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 7FC996BF2B5A4616004AAFF5 /* WebKit.framework */; };
+		7FC996C22B5A464B004AAFF5 /* WebKit.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 7FC996BF2B5A4616004AAFF5 /* WebKit.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		7FC996C72B5A4A98004AAFF5 /* WebView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7FC996C62B5A4A98004AAFF5 /* WebView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -23,12 +26,28 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		7FC996C32B5A464B004AAFF5 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				7FC996C22B5A464B004AAFF5 /* WebKit.framework in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		7FC996A42B5A45B6004AAFF5 /* DoghouseLLM.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = DoghouseLLM.framework; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FC996A72B5A45B6004AAFF5 /* DoghouseLLM.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DoghouseLLM.h; sourceTree = "<group>"; };
 		7FC996A82B5A45B6004AAFF5 /* DoghouseLLM.docc */ = {isa = PBXFileReference; lastKnownFileType = folder.documentationcatalog; path = DoghouseLLM.docc; sourceTree = "<group>"; };
 		7FC996AE2B5A45B6004AAFF5 /* DoghouseLLMTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DoghouseLLMTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		7FC996B32B5A45B6004AAFF5 /* DoghouseLLMTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DoghouseLLMTests.swift; sourceTree = "<group>"; };
+		7FC996BF2B5A4616004AAFF5 /* WebKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WebKit.framework; path = System/Library/Frameworks/WebKit.framework; sourceTree = SDKROOT; };
+		7FC996C62B5A4A98004AAFF5 /* WebView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -36,6 +55,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				7FC996C12B5A464B004AAFF5 /* WebKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -56,6 +76,7 @@
 				7FC996A62B5A45B6004AAFF5 /* DoghouseLLM */,
 				7FC996B22B5A45B6004AAFF5 /* DoghouseLLMTests */,
 				7FC996A52B5A45B6004AAFF5 /* Products */,
+				7FC996BE2B5A4616004AAFF5 /* Frameworks */,
 			);
 			sourceTree = "<group>";
 		};
@@ -73,6 +94,7 @@
 			children = (
 				7FC996A72B5A45B6004AAFF5 /* DoghouseLLM.h */,
 				7FC996A82B5A45B6004AAFF5 /* DoghouseLLM.docc */,
+				7FC996C62B5A4A98004AAFF5 /* WebView.swift */,
 			);
 			path = DoghouseLLM;
 			sourceTree = "<group>";
@@ -83,6 +105,14 @@
 				7FC996B32B5A45B6004AAFF5 /* DoghouseLLMTests.swift */,
 			);
 			path = DoghouseLLMTests;
+			sourceTree = "<group>";
+		};
+		7FC996BE2B5A4616004AAFF5 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				7FC996BF2B5A4616004AAFF5 /* WebKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -107,6 +137,7 @@
 				7FC996A02B5A45B6004AAFF5 /* Sources */,
 				7FC996A12B5A45B6004AAFF5 /* Frameworks */,
 				7FC996A22B5A45B6004AAFF5 /* Resources */,
+				7FC996C32B5A464B004AAFF5 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -142,6 +173,9 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
+				KnownAssetTags = (
+					New,
+				);
 				LastSwiftUpdateCheck = 1520;
 				LastUpgradeCheck = 1520;
 				TargetAttributes = {
@@ -195,6 +229,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				7FC996A92B5A45B6004AAFF5 /* DoghouseLLM.docc in Sources */,
+				7FC996C72B5A4A98004AAFF5 /* WebView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -344,10 +379,13 @@
 		7FC996B92B5A45B6004AAFF5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 447B985TLP;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
@@ -374,10 +412,13 @@
 		7FC996BA2B5A45B6004AAFF5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_IDENTITY = "Apple Development";
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "-";
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
 				CURRENT_PROJECT_VERSION = 1;
 				DEFINES_MODULE = YES;
+				DEVELOPMENT_TEAM = 447B985TLP;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 1;
 				DYLIB_INSTALL_NAME_BASE = "@rpath";
@@ -404,6 +445,7 @@
 		7FC996BC2B5A45B6004AAFF5 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -418,6 +460,7 @@
 		7FC996BD2B5A45B6004AAFF5 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				GENERATE_INFOPLIST_FILE = YES;
