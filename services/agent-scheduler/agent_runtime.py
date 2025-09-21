@@ -187,9 +187,17 @@ class AgentRuntime:
 
     async def _call_hosted_agent(self, agent: Agent, observation: Observation) -> Optional[Action]:
         """Call hosted agent using internal LLM"""
-        # Simple rule-based behavior for demo
-        # In production, this would use LangChain with the agent's model config
+        # Use real LLM integration if available
+        if hasattr(self, 'llm_integration'):
+            # Get recent memories for context
+            memories = await self.memory_system.get_recent_memories(str(agent.id), limit=10)
 
+            # Use LLM to decide action
+            action = await self.llm_integration.decide_action(agent, observation, memories)
+            if action:
+                return action
+
+        # Fallback to simple rule-based behavior
         from packages.shared_types.models import ActionType, ActionParameters
 
         # Get recent memories for context

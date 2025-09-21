@@ -17,6 +17,10 @@ from packages.shared_types.models import (
 from agent_runtime import AgentRuntime
 from memory_system import MemorySystem
 from reflection_engine import ReflectionEngine
+from llm_integration import LLMIntegration, AgentPlanner
+from metrics import metrics_collector
+from fastapi.responses import Response
+from interaction_system import InteractionSystem, InteractionType, MessageType
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -25,6 +29,9 @@ logger = logging.getLogger(__name__)
 agent_runtime: AgentRuntime = None
 memory_system: MemorySystem = None
 reflection_engine: ReflectionEngine = None
+llm_integration: LLMIntegration = None
+agent_planner: AgentPlanner = None
+interaction_system: InteractionSystem = None
 redis_client: redis.Redis = None
 world_orchestrator_url: str = None
 
@@ -32,7 +39,8 @@ world_orchestrator_url: str = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
-    global agent_runtime, memory_system, reflection_engine, redis_client, world_orchestrator_url
+    global agent_runtime, memory_system, reflection_engine, llm_integration, agent_planner
+    global interaction_system, redis_client, world_orchestrator_url
 
     # Initialize Redis
     redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -48,6 +56,16 @@ async def lifespan(app: FastAPI):
     # Initialize reflection engine
     reflection_engine = ReflectionEngine(memory_system)
 
+    # Initialize LLM integration
+    llm_integration = LLMIntegration(memory_system)
+
+    # Initialize agent planner
+    agent_planner = AgentPlanner(memory_system, llm_integration)
+
+    # Initialize interaction system
+    interaction_system = InteractionSystem(memory_system, llm_integration, redis_client)
+    await interaction_system.initialize()
+
     # Initialize agent runtime
     agent_runtime = AgentRuntime(
         redis_client=redis_client,
@@ -55,6 +73,10 @@ async def lifespan(app: FastAPI):
         reflection_engine=reflection_engine,
         world_orchestrator_url=world_orchestrator_url
     )
+
+    # Attach LLM integration to runtime
+    agent_runtime.llm_integration = llm_integration
+    agent_runtime.agent_planner = agent_planner
     await agent_runtime.initialize()
 
     logger.info("Agent Scheduler started successfully")
@@ -235,12 +257,221 @@ async def list_agents():
 
 @app.get("/metrics")
 async def get_metrics():
-    """Get agent scheduler metrics"""
+    """Get agent scheduler metrics in JSON format"""
     try:
         metrics = await agent_runtime.get_metrics()
         return metrics
     except Exception as e:
         logger.error(f"Error getting metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/interactions/initiate")
+async def initiate_interaction(
+    initiator_id: str,
+    target_ids: List[str],
+    interaction_type: str,
+    initial_message: str = None,
+    location: dict = None,
+    context: dict = None
+):
+    """Initiate an interaction between agents"""
+    try:
+        from uuid import UUID
+        interaction = await interaction_system.initiate_interaction(
+            initiator_id=UUID(initiator_id),
+            target_ids=[UUID(tid) for tid in target_ids],
+            interaction_type=InteractionType(interaction_type),
+            initial_message=initial_message,
+            location=location,
+            context=context
+        )
+
+        if interaction:
+            return ApiResponse(success=True, data={"interaction": interaction.to_dict()})
+        else:
+            raise HTTPException(status_code=400, detail="Could not initiate interaction")
+
+    except Exception as e:
+        logger.error(f"Error initiating interaction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/interactions/{interaction_id}/message")
+async def send_interaction_message(
+    interaction_id: str,
+    sender_id: str,
+    message: str,
+    message_type: str = "text"
+):
+    """Send a message in an interaction"""
+    try:
+        from uuid import UUID
+        success = await interaction_system.send_message(
+            interaction_id=UUID(interaction_id),
+            sender_id=UUID(sender_id),
+            message=message,
+            message_type=MessageType(message_type)
+        )
+
+        if success:
+            return ApiResponse(success=True, data={"status": "message_sent"})
+        else:
+            raise HTTPException(status_code=400, detail="Could not send message")
+
+    except Exception as e:
+        logger.error(f"Error sending message: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/interactions/{interaction_id}/generate-response")
+async def generate_interaction_response(
+    interaction_id: str,
+    agent_id: str,
+    context_messages: List[dict] = None
+):
+    """Generate a response for an agent in an interaction"""
+    try:
+        from uuid import UUID
+        response = await interaction_system.generate_response(
+            agent_id=UUID(agent_id),
+            interaction_id=UUID(interaction_id),
+            context_messages=context_messages
+        )
+
+        if response:
+            return ApiResponse(success=True, data={"response": response})
+        else:
+            raise HTTPException(status_code=400, detail="Could not generate response")
+
+    except Exception as e:
+        logger.error(f"Error generating response: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/interactions/{interaction_id}/end")
+async def end_interaction(
+    interaction_id: str,
+    ender_id: str,
+    reason: str = None,
+    outcomes: dict = None
+):
+    """End an interaction"""
+    try:
+        from uuid import UUID
+        success = await interaction_system.end_interaction(
+            interaction_id=UUID(interaction_id),
+            ender_id=UUID(ender_id),
+            reason=reason,
+            outcomes=outcomes
+        )
+
+        if success:
+            return ApiResponse(success=True, data={"status": "interaction_ended"})
+        else:
+            raise HTTPException(status_code=400, detail="Could not end interaction")
+
+    except Exception as e:
+        logger.error(f"Error ending interaction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/interactions/{interaction_id}")
+async def get_interaction(interaction_id: str):
+    """Get details of a specific interaction"""
+    try:
+        from uuid import UUID
+        interaction = await interaction_system.get_interaction(UUID(interaction_id))
+
+        if interaction:
+            return interaction.to_dict()
+        else:
+            raise HTTPException(status_code=404, detail="Interaction not found")
+
+    except Exception as e:
+        logger.error(f"Error getting interaction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/agents/{agent_id}/interactions")
+async def get_agent_interactions(agent_id: str):
+    """Get all active interactions for an agent"""
+    try:
+        from uuid import UUID
+        interactions = await interaction_system.get_agent_interactions(UUID(agent_id))
+        return {
+            "agent_id": agent_id,
+            "active_interactions": [i.to_dict() for i in interactions]
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting agent interactions: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/interactions/{interaction_id}/analyze")
+async def analyze_interaction(interaction_id: str):
+    """Analyze an interaction for insights"""
+    try:
+        from uuid import UUID
+        analysis = await interaction_system.analyze_interaction(UUID(interaction_id))
+        return analysis
+
+    except Exception as e:
+        logger.error(f"Error analyzing interaction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/agents/{agent_id}/interaction-history")
+async def get_interaction_history(agent_id: str, limit: int = 10):
+    """Get interaction history for an agent"""
+    try:
+        from uuid import UUID
+        history = await interaction_system.get_interaction_history(UUID(agent_id), limit)
+        return {
+            "agent_id": agent_id,
+            "history": history
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting interaction history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/interactions/metrics")
+async def get_interaction_metrics():
+    """Get interaction system metrics"""
+    try:
+        metrics = await interaction_system.get_interaction_metrics()
+        return metrics
+
+    except Exception as e:
+        logger.error(f"Error getting interaction metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/metrics/prometheus")
+async def get_prometheus_metrics():
+    """Get metrics in Prometheus format"""
+    try:
+        # Update agent metrics
+        agent_stats = await agent_runtime.get_agent_stats()
+        metrics_collector.update_agent_metrics(agent_stats)
+
+        # Update memory metrics
+        memory_stats = await memory_system.get_memory_stats() if hasattr(memory_system, 'get_memory_stats') else {}
+        metrics_collector.update_memory_metrics(memory_stats)
+
+        # Update queue metrics
+        queue_size = await agent_runtime.get_task_queue_size() if hasattr(agent_runtime, 'get_task_queue_size') else 0
+        metrics_collector.update_queue_metrics(queue_size)
+
+        # Get Prometheus formatted metrics
+        metrics_data = metrics_collector.get_metrics()
+
+        return Response(content=metrics_data, media_type="text/plain")
+    except Exception as e:
+        logger.error(f"Error getting Prometheus metrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

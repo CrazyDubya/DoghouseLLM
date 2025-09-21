@@ -17,9 +17,13 @@ from packages.shared_types.models import (
     WorldState, Event, Agent, Location, District,
     EventType, ApiResponse, HealthCheck
 )
+from governance_system import ProposalType, VoteChoice
+from uuid import UUID
 from world_engine import WorldEngine
 from database import Database
 from mqtt_client import MQTTClient
+from metrics import metrics_collector
+from fastapi.responses import Response
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -194,14 +198,324 @@ async def force_tick():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/economy/transaction")
+async def create_transaction(
+    sender_id: str,
+    receiver_id: str,
+    amount: float,
+    transaction_type: str = "payment",
+    metadata: dict = None
+):
+    """Create an economic transaction between agents"""
+    try:
+        if not world_engine.economy:
+            raise HTTPException(status_code=503, detail="Economy system not available")
+
+        transaction = await world_engine.economy.process_transaction(
+            UUID(sender_id),
+            UUID(receiver_id),
+            amount,
+            transaction_type,
+            metadata or {}
+        )
+
+        if transaction:
+            return ApiResponse(success=True, data={"transaction": transaction.dict()})
+        else:
+            raise HTTPException(status_code=400, detail="Transaction failed")
+
+    except Exception as e:
+        logger.error(f"Error processing transaction: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/economy/balance/{agent_id}")
+async def get_agent_balance(agent_id: str):
+    """Get an agent's economic balance"""
+    try:
+        if not world_engine.economy:
+            raise HTTPException(status_code=503, detail="Economy system not available")
+
+        balance = await world_engine.economy.get_balance(UUID(agent_id))
+        wealth = await world_engine.economy.calculate_agent_wealth(UUID(agent_id))
+
+        return {
+            "agent_id": agent_id,
+            "balance": balance,
+            "wealth": wealth,
+            "currency": world_engine.economy.currency_name
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting agent balance: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/economy/metrics")
+async def get_economy_metrics():
+    """Get economic system metrics"""
+    try:
+        if not world_engine.economy:
+            raise HTTPException(status_code=503, detail="Economy system not available")
+
+        metrics = await world_engine.economy.get_economic_metrics()
+        return metrics
+
+    except Exception as e:
+        logger.error(f"Error getting economy metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/metrics")
 async def get_metrics():
-    """Get world simulation metrics"""
+    """Get world simulation metrics in JSON format"""
     try:
         metrics = await world_engine.get_metrics()
         return metrics
     except Exception as e:
         logger.error(f"Error getting metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/governance/proposals")
+async def create_proposal(
+    proposer_id: str,
+    proposal_type: str,
+    title: str,
+    description: str,
+    metadata: dict = None,
+    voting_duration_hours: int = 24
+):
+    """Create a new governance proposal"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        proposal = await world_engine.governance.create_proposal(
+            proposer_id=UUID(proposer_id),
+            proposal_type=ProposalType(proposal_type),
+            title=title,
+            description=description,
+            metadata=metadata or {},
+            voting_duration_hours=voting_duration_hours
+        )
+
+        if proposal:
+            return ApiResponse(success=True, data={"proposal": proposal.to_dict()})
+        else:
+            raise HTTPException(status_code=400, detail="Could not create proposal")
+
+    except Exception as e:
+        logger.error(f"Error creating proposal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/governance/proposals/{proposal_id}/start-voting")
+async def start_voting(proposal_id: str):
+    """Start voting on a proposal"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        success = await world_engine.governance.start_voting(UUID(proposal_id))
+
+        if success:
+            return ApiResponse(success=True, data={"status": "voting_started"})
+        else:
+            raise HTTPException(status_code=400, detail="Could not start voting")
+
+    except Exception as e:
+        logger.error(f"Error starting voting: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/governance/proposals/{proposal_id}/vote")
+async def cast_vote(
+    proposal_id: str,
+    voter_id: str,
+    vote: str,
+    comment: str = None
+):
+    """Cast a vote on a proposal"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        success = await world_engine.governance.cast_vote(
+            proposal_id=UUID(proposal_id),
+            voter_id=UUID(voter_id),
+            vote=VoteChoice(vote),
+            comment=comment
+        )
+
+        if success:
+            return ApiResponse(success=True, data={"status": "vote_cast"})
+        else:
+            raise HTTPException(status_code=400, detail="Could not cast vote")
+
+    except Exception as e:
+        logger.error(f"Error casting vote: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/governance/proposals")
+async def get_active_proposals():
+    """Get all active proposals"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        proposals = await world_engine.governance.get_active_proposals()
+        return {
+            "proposals": [p.to_dict() for p in proposals]
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting active proposals: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/governance/proposals/{proposal_id}")
+async def get_proposal(proposal_id: str):
+    """Get a specific proposal"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        proposal = await world_engine.governance.get_proposal(UUID(proposal_id))
+
+        if proposal:
+            return proposal.to_dict()
+        else:
+            raise HTTPException(status_code=404, detail="Proposal not found")
+
+    except Exception as e:
+        logger.error(f"Error getting proposal: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/governance/proposals/{proposal_id}/results")
+async def get_voting_results(proposal_id: str):
+    """Get voting results for a proposal"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        results = await world_engine.governance.tally_votes(UUID(proposal_id))
+        return results
+
+    except Exception as e:
+        logger.error(f"Error getting voting results: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/governance/agents/{agent_id}/reputation")
+async def get_agent_reputation(agent_id: str):
+    """Get an agent's reputation score"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        reputation = await world_engine.governance.get_reputation(UUID(agent_id))
+        return {
+            "agent_id": agent_id,
+            "reputation": reputation,
+            "can_propose": reputation >= world_engine.governance.min_reputation_to_propose,
+            "can_vote": reputation >= world_engine.governance.min_reputation_to_vote
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting agent reputation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/governance/agents/{agent_id}/voting-history")
+async def get_agent_voting_history(agent_id: str):
+    """Get voting history for an agent"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        history = await world_engine.governance.get_agent_voting_history(UUID(agent_id))
+        return {
+            "agent_id": agent_id,
+            "voting_history": history
+        }
+
+    except Exception as e:
+        logger.error(f"Error getting voting history: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/governance/council/{agent_id}/add")
+async def add_council_member(agent_id: str):
+    """Add an agent to the council (admin only)"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        await world_engine.governance.add_council_member(UUID(agent_id))
+        return ApiResponse(success=True, data={"status": "added_to_council"})
+
+    except Exception as e:
+        logger.error(f"Error adding council member: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/governance/council/{agent_id}/remove")
+async def remove_council_member(agent_id: str):
+    """Remove an agent from the council (admin only)"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        await world_engine.governance.remove_council_member(UUID(agent_id))
+        return ApiResponse(success=True, data={"status": "removed_from_council"})
+
+    except Exception as e:
+        logger.error(f"Error removing council member: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/governance/metrics")
+async def get_governance_metrics():
+    """Get governance system metrics"""
+    try:
+        if not world_engine.governance:
+            raise HTTPException(status_code=503, detail="Governance system not available")
+
+        metrics = await world_engine.governance.get_governance_metrics()
+        return metrics
+
+    except Exception as e:
+        logger.error(f"Error getting governance metrics: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/metrics/prometheus")
+async def get_prometheus_metrics():
+    """Get metrics in Prometheus format"""
+    try:
+        # Update metrics from current state
+        world_state = await world_engine.get_world_state()
+        metrics_collector.update_world_metrics(world_state.dict())
+
+        # Update economy metrics if available
+        if world_engine.economy:
+            economy_metrics = await world_engine.economy.get_economic_metrics()
+            metrics_collector.update_economy_metrics(economy_metrics)
+
+        # Update property metrics if available
+        if world_engine.property_manager:
+            property_metrics = await world_engine.property_manager.get_property_metrics()
+            metrics_collector.update_property_metrics(property_metrics)
+
+        # Get Prometheus formatted metrics
+        metrics_data = metrics_collector.get_metrics()
+
+        return Response(content=metrics_data, media_type="text/plain")
+    except Exception as e:
+        logger.error(f"Error getting Prometheus metrics: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 

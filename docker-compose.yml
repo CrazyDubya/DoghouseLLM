@@ -53,10 +53,21 @@ services:
       - REDIS_URL=redis://redis:6379
       - MQTT_HOST=mqtt-broker
       - MQTT_PORT=1883
+      - QDRANT_URL=http://qdrant:6333
     ports:
       - "8001:8000"
     volumes:
       - ./services/world-orchestrator:/app
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    security_opt:
+      - no-new-privileges:true
 
   agent-scheduler:
     build:
@@ -67,16 +78,30 @@ services:
       - redis
       - mqtt-broker
       - world-orchestrator
+      - qdrant
     environment:
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/multiagent_city
       - REDIS_URL=redis://redis:6379
       - MQTT_HOST=mqtt-broker
       - MQTT_PORT=1883
       - WORLD_ORCHESTRATOR_URL=http://world-orchestrator:8000
+      - QDRANT_URL=http://qdrant:6333
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
     ports:
       - "8002:8000"
     volumes:
       - ./services/agent-scheduler:/app
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+    security_opt:
+      - no-new-privileges:true
 
   api-gateway:
     build:
@@ -89,10 +114,22 @@ services:
       - WORLD_ORCHESTRATOR_URL=http://world-orchestrator:8000
       - AGENT_SCHEDULER_URL=http://agent-scheduler:8000
       - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=${JWT_SECRET:-development_secret_change_in_production}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     ports:
       - "8000:8000"
     volumes:
       - ./services/api-gateway:/app
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    security_opt:
+      - no-new-privileges:true
 
   # Monitoring
   prometheus:

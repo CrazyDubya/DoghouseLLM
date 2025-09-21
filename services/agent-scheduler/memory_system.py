@@ -19,6 +19,7 @@ class MemorySystem:
     def __init__(self, redis_client):
         self.redis = redis_client
         self.embedding_model = None
+        self.vector_store = None
         self.is_initialized = False
 
     async def initialize(self):
@@ -27,6 +28,17 @@ class MemorySystem:
             # Initialize sentence transformer for embeddings
             # Using a lightweight model for demo
             self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
+
+            # Try to initialize Qdrant vector store
+            try:
+                from vector_memory import VectorMemoryStore
+                self.vector_store = VectorMemoryStore()
+                await self.vector_store.initialize()
+                logger.info("Vector memory store (Qdrant) initialized")
+            except Exception as e:
+                logger.warning(f"Could not initialize Qdrant: {e}")
+                logger.info("Using Redis-only memory storage")
+
             self.is_initialized = True
             logger.info("Memory system initialized successfully")
         except Exception as e:
@@ -40,6 +52,19 @@ class MemorySystem:
     async def store_memory(self, memory: Memory) -> str:
         """Store a memory for an agent"""
         try:
+            # Store in vector database if available
+            if self.vector_store:
+                success = await self.vector_store.store_memory(memory)
+                if success:
+                    logger.debug(f"Stored memory {memory.id} in Qdrant")
+                    # Also store basic info in Redis for quick access
+                    await self.redis.zadd(
+                        f"agent_memories:{memory.agent_id}",
+                        {str(memory.id): memory.timestamp.timestamp()}
+                    )
+                    return str(memory.id)
+
+            # Fall back to Redis-only storage
             # Generate embedding for semantic search
             embedding = self.embedding_model.encode(memory.content).tolist()
 
@@ -112,6 +137,13 @@ class MemorySystem:
     ) -> List[Memory]:
         """Search memories using semantic similarity"""
         try:
+            # Use vector store if available
+            if self.vector_store:
+                return await self.vector_store.search_memories(
+                    agent_id, query, limit, memory_type, min_importance
+                )
+
+            # Fall back to Redis-based search
             # Generate query embedding
             query_embedding = self.embedding_model.encode(query).tolist()
 
@@ -181,6 +213,13 @@ class MemorySystem:
     ) -> List[Memory]:
         """Get recent memories for an agent"""
         try:
+            # Use vector store if available
+            if self.vector_store:
+                return await self.vector_store.get_recent_memories(
+                    agent_id, limit, hours
+                )
+
+            # Fall back to Redis
             # Calculate timestamp threshold
             threshold = datetime.utcnow() - timedelta(hours=hours)
             timestamp_score = threshold.timestamp()

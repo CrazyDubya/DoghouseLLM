@@ -33,6 +33,15 @@ class WorldEngine:
         self.districts: Dict[str, District] = {}
         self.events_queue = asyncio.Queue()
 
+        # Economic system
+        self.economy = None
+
+        # Property manager
+        self.property_manager = None
+
+        # Governance system
+        self.governance = None
+
         # Metrics
         self.metrics = {
             "total_agents": 0,
@@ -45,6 +54,21 @@ class WorldEngine:
     async def initialize(self):
         """Initialize the world engine"""
         logger.info("Initializing World Engine...")
+
+        # Initialize economy system
+        from economy_system import EconomySystem
+        self.economy = EconomySystem(self.db, self.redis)
+        await self.economy.initialize()
+
+        # Initialize property manager
+        from property_manager import PropertyManager
+        self.property_manager = PropertyManager(self.db, self.redis, self.economy)
+        await self.property_manager.initialize()
+
+        # Initialize governance system
+        from governance_system import GovernanceSystem
+        self.governance = GovernanceSystem(self.db, self.redis, self.economy)
+        await self.governance.initialize()
 
         # Create default districts
         await self._create_default_districts()
@@ -230,6 +254,10 @@ class WorldEngine:
             agent.state.location = location
             agent.state.status = "active"
 
+            # Create economic account for agent
+            if self.economy:
+                await self.economy.create_agent_account(agent_id)
+
             # Broadcast spawn event
             spawn_message = {
                 "type": "agent_spawned",
@@ -275,8 +303,35 @@ class WorldEngine:
 
     async def _handle_transaction(self, event: Event):
         """Handle transaction event"""
-        # Implementation for processing transactions
-        pass
+        if not self.economy:
+            logger.warning("Economy system not initialized")
+            return
+
+        transaction_data = event.data
+        sender_id = UUID(transaction_data["sender_id"])
+        receiver_id = UUID(transaction_data["receiver_id"])
+        amount = float(transaction_data["amount"])
+        transaction_type = transaction_data.get("type", "payment")
+        metadata = transaction_data.get("metadata", {})
+
+        # Process the transaction
+        transaction = await self.economy.process_transaction(
+            sender_id, receiver_id, amount, transaction_type, metadata
+        )
+
+        if transaction:
+            # Broadcast transaction completed
+            await self.mqtt.publish_world_event(
+                "transaction_completed",
+                {
+                    "transaction_id": str(transaction.id),
+                    "sender": str(sender_id),
+                    "receiver": str(receiver_id),
+                    "amount": amount
+                }
+            )
+        else:
+            logger.warning(f"Transaction failed: {sender_id} -> {receiver_id}, {amount}")
 
     async def spawn_agent(self, agent_id: str, location: Location):
         """Spawn an agent at a location"""
@@ -399,13 +454,24 @@ class WorldEngine:
         active_agents = sum(1 for agent in self.agents.values() if agent.state.status == "active")
         weather = await self.redis.get("world:weather") or "sunny"
 
+        # Get economic metrics
+        economy_data = {"total_transactions": 0, "gdp": 0}
+        if self.economy:
+            economy_metrics = await self.economy.get_economic_metrics()
+            economy_data = {
+                "total_transactions": economy_metrics["total_transactions"],
+                "gdp": economy_metrics["gdp"],
+                "average_balance": economy_metrics["average_balance"],
+                "total_supply": economy_metrics["total_supply"]
+            }
+
         return WorldState(
             tick=self.current_tick,
             time=datetime.utcnow(),
             active_agents=active_agents,
             total_events=self.metrics["total_events"],
             weather=weather.decode() if isinstance(weather, bytes) else weather,
-            economy={"total_transactions": 0, "gdp": 1000000}
+            economy=economy_data
         )
 
     async def get_active_agents(self) -> List[Agent]:
