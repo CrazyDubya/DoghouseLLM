@@ -1,0 +1,54 @@
+# Prometheus configuration for Multi-Agent City monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+rule_files:
+  # - "first_rules.yml"
+  # - "second_rules.yml"
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # API Gateway
+  - job_name: 'api-gateway'
+    static_configs:
+      - targets: ['api-gateway:8000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # World Orchestrator
+  - job_name: 'world-orchestrator'
+    static_configs:
+      - targets: ['world-orchestrator:8000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Agent Scheduler
+  - job_name: 'agent-scheduler'
+    static_configs:
+      - targets: ['agent-scheduler:8000']
+    metrics_path: /metrics
+    scrape_interval: 10s
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    # Would need Redis exporter in production
+
+  # PostgreSQL
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres:5432']
+    # Would need Postgres exporter in production
+
+  # MQTT Broker
+  - job_name: 'mqtt'
+    static_configs:
+      - targets: ['mqtt-broker:1883']
+    # Would need MQTT exporter in production

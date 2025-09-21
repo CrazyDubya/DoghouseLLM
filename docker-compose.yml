@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  # Core Infrastructure
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: multiagent_city
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init_db.sql:/docker-entrypoint-initdb.d/init_db.sql
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+  mqtt-broker:
+    image: eclipse-mosquitto:2.0
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./infrastructure/docker/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - mosquitto_data:/mosquitto/data
+      - mosquitto_logs:/mosquitto/log
+
+  # Vector Database (using Qdrant as alternative to Pinecone)
+  qdrant:
+    image: qdrant/qdrant:latest
+    ports:
+      - "6333:6333"
+    volumes:
+      - qdrant_data:/qdrant/storage
+
+  # Core Services
+  world-orchestrator:
+    build:
+      context: .
+      dockerfile: services/world-orchestrator/Dockerfile
+    depends_on:
+      - postgres
+      - redis
+      - mqtt-broker
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/multiagent_city
+      - REDIS_URL=redis://redis:6379
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=1883
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./services/world-orchestrator:/app
+
+  agent-scheduler:
+    build:
+      context: .
+      dockerfile: services/agent-scheduler/Dockerfile
+    depends_on:
+      - postgres
+      - redis
+      - mqtt-broker
+      - world-orchestrator
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/multiagent_city
+      - REDIS_URL=redis://redis:6379
+      - MQTT_HOST=mqtt-broker
+      - MQTT_PORT=1883
+      - WORLD_ORCHESTRATOR_URL=http://world-orchestrator:8000
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./services/agent-scheduler:/app
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    depends_on:
+      - world-orchestrator
+      - agent-scheduler
+    environment:
+      - WORLD_ORCHESTRATOR_URL=http://world-orchestrator:8000
+      - AGENT_SCHEDULER_URL=http://agent-scheduler:8000
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./services/api-gateway:/app
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  postgres_data:
+  redis_data:
+  mosquitto_data:
+  mosquitto_logs:
+  qdrant_data:
+  prometheus_data:
+  grafana_data:
