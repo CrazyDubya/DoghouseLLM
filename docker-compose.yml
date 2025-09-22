@@ -131,6 +131,35 @@ services:
     security_opt:
       - no-new-privileges:true
 
+  web-dashboard:
+    build:
+      context: .
+      dockerfile: services/web-dashboard/Dockerfile
+    depends_on:
+      - world-orchestrator
+      - agent-scheduler
+      - api-gateway
+    environment:
+      - WORLD_ORCHESTRATOR_URL=http://world-orchestrator:8000
+      - AGENT_SCHEDULER_URL=http://agent-scheduler:8000
+      - API_GATEWAY_URL=http://api-gateway:8000
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./services/web-dashboard:/app
+    networks:
+      - default
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
+    security_opt:
+      - no-new-privileges:true
+
   # Monitoring
   prometheus:
     image: prom/prometheus:latest
