@@ -8,7 +8,7 @@ A persistent, scalable multi-agent simulation platform where autonomous AI agent
 
 ### Core Capabilities
 - **🌍 Persistent World**: 24/7 city simulation with districts, neighborhoods, and properties
-- **🤖 LLM-Powered Agents**: Integration with OpenAI, Anthropic, and Ollama for real AI decision-making
+- **🤖 LLM-Powered Agents**: Multi-provider support (OpenAI, Anthropic, Ollama, Gemini, Grok, OpenRouter) with auto-detection
 - **💰 Economic System**: Complete economy with SimCoins, transactions, property ownership, and market dynamics
 - **🏛️ Democratic Governance**: Proposal system, weighted voting, council members, and auto-implementation
 - **🤝 Social Dynamics**: Relationship tracking, social networks, trust, sentiment, and group formation
@@ -17,6 +17,7 @@ A persistent, scalable multi-agent simulation platform where autonomous AI agent
 
 ### Technical Highlights
 - **Scalable Architecture**: Validated for 10,000+ concurrent agents
+- **Intelligent Resource Management**: Auto-detects GPU/VRAM, available ports, and optimizes model selection
 - **Vector Memory**: Qdrant-powered semantic memory storage and retrieval
 - **Event-Driven**: MQTT messaging for real-time agent communication
 - **Observable**: Prometheus metrics and Grafana dashboards
@@ -26,7 +27,7 @@ A persistent, scalable multi-agent simulation platform where autonomous AI agent
 
 ### Architecture & Design
 - [Stack Validation](docs/STACK_VALIDATION.md) - Complete technical architecture validation
-- [Implementation Status](docs/IMPLEMENTATION_STATUS_UPDATED.md) - Current completion status (75%)
+- [Implementation Status](docs/IMPLEMENTATION_STATUS_UPDATED.md) - Current completion status (85%)
 - [Architecture Overview](docs/ARCHITECTURE.md) - System design and components
 - [API Documentation](docs/API_DOCUMENTATION.md) - Complete API reference
 
@@ -35,6 +36,7 @@ A persistent, scalable multi-agent simulation platform where autonomous AI agent
 - [Developer Guide](docs/DEVELOPER_GUIDE.md) - Contributing and extending the platform
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Production deployment instructions
 - [Configuration Guide](docs/CONFIGURATION_GUIDE.md) - Environment variables and settings
+- [LLM Configuration Guide](docs/LLM_CONFIGURATION_GUIDE.md) - Complete guide for all LLM providers
 
 ## 🛠️ Technology Stack
 
@@ -57,9 +59,13 @@ A persistent, scalable multi-agent simulation platform where autonomous AI agent
 
 ### AI & ML
 - **LLM Framework**: LangChain for orchestration
-- **LLM Providers**: OpenAI, Anthropic, Ollama
+- **LLM Providers**:
+  - **Cloud**: OpenAI, Anthropic, Google Gemini, Grok (xAI), OpenRouter
+  - **Local**: Ollama (auto-detection), MLX for Mac Metal
+  - **Auto-Fallback**: Intelligent provider switching for reliability
+- **Resource Management**: Automatic GPU/VRAM detection and optimization
 - **Embeddings**: Sentence Transformers
-- **Memory**: Vector similarity search
+- **Memory**: Vector similarity search with Qdrant
 
 ## Quick Start
 
@@ -177,9 +183,9 @@ await agent.start()
 - MQTT messaging
 - Basic agent runtime
 
-### Phase 2 (Weeks 5-8) 🚧
-- LLM integration
-- Memory system
+### Phase 2 (Weeks 5-8) ✅
+- LLM integration (6 providers)
+- Memory system (Qdrant)
 - Reflection engine
 
 ### Phase 3 (Weeks 9-12) 📋

@@ -11,6 +11,9 @@ from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from langchain_community.llms import Ollama
 
+# Import our comprehensive LLM manager
+from llm_manager import MultiProviderLLM, LLMProvider
+
 from packages.shared_types.models import (
     Agent, Action, ActionType, ActionParameters,
     Observation, Memory
@@ -20,15 +23,21 @@ logger = logging.getLogger(__name__)
 
 
 class LLMIntegration:
-    """Real LLM integration for agent decision making"""
+    """Real LLM integration for agent decision making with multi-provider support"""
 
     def __init__(self, memory_system):
         self.memory_system = memory_system
         self.models = {}
+        self.multi_provider_llm = MultiProviderLLM()
+        self.initialized = False
         self._initialize_models()
 
     def _initialize_models(self):
         """Initialize available LLM models"""
+        # Initialize multi-provider system
+        asyncio.create_task(self._async_init())
+
+        # Keep backward compatibility with existing code
         # OpenAI
         openai_key = os.getenv("OPENAI_API_KEY")
         if openai_key:
@@ -71,6 +80,60 @@ class LLMIntegration:
         if not self.models:
             logger.warning("No LLM API keys found, using demo mode")
             self.models["demo"] = DemoLLM()
+
+    async def _async_init(self):
+        """Asynchronously initialize multi-provider LLM system"""
+        try:
+            await self.multi_provider_llm.initialize()
+            self.initialized = True
+
+            # Log available models
+            available = self.multi_provider_llm.get_available_models()
+            total_models = sum(len(models) for models in available.values())
+            logger.info(f"Multi-provider LLM initialized: {total_models} models available across {len(available)} providers")
+
+            # Add multi-provider models to our models dict
+            for provider_name, models in available.items():
+                for model in models:
+                    model_key = f"{provider_name}/{model}"
+                    self.models[model_key] = self.multi_provider_llm
+
+        except Exception as e:
+            logger.error(f"Error initializing multi-provider LLM: {e}")
+
+    async def decide_action_multi_provider(
+        self,
+        agent: Agent,
+        observation: Observation,
+        recent_memories: List[Memory],
+        provider: Optional[str] = None,
+        model: Optional[str] = None
+    ) -> Optional[Action]:
+        """Decide action using multi-provider LLM system"""
+        try:
+            # Build context
+            memory_context = self._build_memory_context(recent_memories)
+            prompt = self._create_decision_prompt(agent, observation, memory_context)
+
+            # Add system prompt
+            full_prompt = f"{self._get_system_prompt(agent)}\n\n{prompt}"
+
+            # Generate response using multi-provider system
+            response = await self.multi_provider_llm.generate(
+                prompt=full_prompt,
+                model=model,
+                provider=LLMProvider[provider.upper()] if provider else None,
+                temperature=0.7,
+                max_tokens=500
+            )
+
+            # Parse response into action
+            action = self._parse_action_response(response, agent.id, observation)
+            return action
+
+        except Exception as e:
+            logger.error(f"Error in multi-provider LLM decision: {e}")
+            return self._get_fallback_action(agent, observation)
 
     async def decide_action(
         self,
