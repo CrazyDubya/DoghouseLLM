@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>World Map - Multi-Agent City</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.5);
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        .header h1 {
+            font-size: 1.5em;
+        }
+
+        .back-button {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+
+        .back-button:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .world-container {
+            flex: 1;
+            display: flex;
+            position: relative;
+        }
+
+        .world-map {
+            flex: 1;
+            position: relative;
+            background: radial-gradient(circle at center, #16213e, #0f3460);
+            overflow: hidden;
+        }
+
+        .district {
+            position: absolute;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 15px;
+            padding: 20px;
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(5px);
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .district:hover {
+            background: rgba(255,255,255,0.2);
+            transform: scale(1.05);
+            z-index: 10;
+        }
+
+        .district-name {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .district-stats {
+            font-size: 0.9em;
+            opacity: 0.9;
+        }
+
+        .agent-marker {
+            position: absolute;
+            width: 10px;
+            height: 10px;
+            background: #4fc3f7;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(79, 195, 247, 0.5);
+            transition: all 0.5s;
+            cursor: pointer;
+        }
+
+        .agent-marker:hover {
+            transform: scale(1.5);
+            z-index: 100;
+        }
+
+        .agent-marker.moving {
+            background: #66bb6a;
+        }
+
+        .agent-marker.interacting {
+            background: #ffa726;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: rgba(0,0,0,0.7);
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 15px;
+            color: #4fc3f7;
+        }
+
+        .info-section {
+            background: rgba(255,255,255,0.05);
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+        }
+
+        .info-item {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .info-item:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            font-size: 0.9em;
+            opacity: 0.7;
+        }
+
+        .info-value {
+            font-size: 1.1em;
+            font-weight: bold;
+            color: #4fc3f7;
+        }
+
+        .legend {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .legend-color {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 320px;
+            background: rgba(0,0,0,0.7);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .control-button {
+            background: rgba(79, 195, 247, 0.2);
+            border: 1px solid #4fc3f7;
+            color: #4fc3f7;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .control-button:hover {
+            background: rgba(79, 195, 247, 0.3);
+        }
+
+        .control-button.active {
+            background: #4fc3f7;
+            color: #000;
+        }
+
+        /* District specific colors */
+        .district.downtown {
+            background: rgba(147, 51, 234, 0.2);
+            border-color: #9333ea;
+        }
+
+        .district.market-square {
+            background: rgba(236, 72, 153, 0.2);
+            border-color: #ec4899;
+        }
+
+        .district.tech-hub {
+            background: rgba(59, 130, 246, 0.2);
+            border-color: #3b82f6;
+        }
+
+        .district.residential {
+            background: rgba(34, 197, 94, 0.2);
+            border-color: #22c55e;
+        }
+
+        .connection-line {
+            position: absolute;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+            height: 1px;
+            transform-origin: left center;
+            pointer-events: none;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.8; }
+        }
+
+        .tooltip {
+            position: absolute;
+            background: rgba(0,0,0,0.9);
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            pointer-events: none;
+            z-index: 1000;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🗺️ World Map</h1>
+            <a href="/" class="back-button">← Back to Dashboard</a>
+        </div>
+
+        <div class="world-container">
+            <div class="world-map" id="worldMap">
+                <!-- Districts will be dynamically added -->
+
+                <!-- Legend -->
+                <div class="legend">
+                    <h3 style="margin-bottom: 10px;">Legend</h3>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #4fc3f7;"></div>
+                        <span>Idle Agent</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #66bb6a;"></div>
+                        <span>Moving Agent</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #ffa726;"></div>
+                        <span>Interacting Agent</span>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="controls">
+                    <button class="control-button" id="toggleAgents">Show Agents</button>
+                    <button class="control-button" id="toggleConnections">Show Connections</button>
+                    <button class="control-button" id="autoFollow">Auto Follow</button>
+                </div>
+            </div>
+
+            <div class="sidebar">
+                <h2>World Information</h2>
+
+                <div class="info-section">
+                    <h3>Selected District</h3>
+                    <div id="districtInfo">
+                        <p style="opacity: 0.6;">Click on a district to see details</p>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>World Statistics</h3>
+                    <div class="info-item">
+                        <div class="info-label">Total Districts</div>
+                        <div class="info-value" id="totalDistricts">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Active Agents</div>
+                        <div class="info-value" id="totalAgents">0</div>
+                    </div>
+                    <div class="info-item">
+                        <div class="info-label">Population Density</div>
+                        <div class="info-value" id="popDensity">0</div>
+                    </div>
+                </div>
+
+                <div class="info-section">
+                    <h3>Recent Activity</h3>
+                    <div id="recentActivity">
+                        <p style="opacity: 0.6;">No recent activity</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+        let ws = null;
+        let districts = [];
+        let agents = [];
+        let showAgents = true;
+        let showConnections = false;
+        let autoFollow = false;
+        let selectedDistrict = null;
+
+        // District positions (manual layout for now)
+        const districtLayouts = {
+            'Downtown': { x: 40, y: 30, width: 250, height: 200, type: 'downtown' },
+            'Market Square': { x: 320, y: 50, width: 200, height: 180, type: 'market-square' },
+            'Tech Hub': { x: 550, y: 100, width: 220, height: 200, type: 'tech-hub' },
+            'Residential Zone': { x: 100, y: 280, width: 300, height: 150, type: 'residential' }
+        };
+
+        async function loadDistricts() {
+            try {
+                const response = await fetch('/api/world/districts');
+                districts = await response.json();
+                renderDistricts();
+            } catch (error) {
+                console.error('Error loading districts:', error);
+            }
+        }
+
+        function renderDistricts() {
+            const worldMap = document.getElementById('worldMap');
+
+            // Clear existing districts
+            document.querySelectorAll('.district').forEach(d => d.remove());
+
+            districts.forEach(district => {
+                const layout = districtLayouts[district.name] || {
+                    x: Math.random() * 600 + 50,
+                    y: Math.random() * 300 + 50,
+                    width: 200,
+                    height: 150,
+                    type: 'default'
+                };
+
+                const districtEl = document.createElement('div');
+                districtEl.className = `district ${layout.type}`;
+                districtEl.style.left = layout.x + 'px';
+                districtEl.style.top = layout.y + 'px';
+                districtEl.style.width = layout.width + 'px';
+                districtEl.style.height = layout.height + 'px';
+                districtEl.dataset.districtId = district.id;
+
+                districtEl.innerHTML = `
+                    <div class="district-name">${district.name}</div>
+                    <div class="district-stats">
+                        Population: <span id="pop-${district.id}">${district.population || 0}</span><br>
+                        Neighborhoods: ${district.neighborhoods?.length || 0}
+                    </div>
+                `;
+
+                districtEl.addEventListener('click', () => selectDistrict(district));
+                worldMap.appendChild(districtEl);
+            });
+
+            document.getElementById('totalDistricts').textContent = districts.length;
+        }
+
+        function selectDistrict(district) {
+            selectedDistrict = district;
+            const infoDiv = document.getElementById('districtInfo');
+
+            infoDiv.innerHTML = `
+                <div class="info-item">
+                    <div class="info-label">Name</div>
+                    <div class="info-value">${district.name}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Population</div>
+                    <div class="info-value">${district.population || 0}</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Base Rent</div>
+                    <div class="info-value">${district.economy?.base_rent || 0} credits</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Business Tax</div>
+                    <div class="info-value">${((district.economy?.business_tax || 0) * 100).toFixed(0)}%</div>
+                </div>
+                <div class="info-item">
+                    <div class="info-label">Neighborhoods</div>
+                    <div class="info-value">${district.neighborhoods?.join(', ') || 'None'}</div>
+                </div>
+            `;
+
+            // Highlight selected district
+            document.querySelectorAll('.district').forEach(d => {
+                d.style.opacity = d.dataset.districtId === district.id ? '1' : '0.7';
+            });
+        }
+
+        function renderAgents(agentData) {
+            if (!showAgents) return;
+
+            const worldMap = document.getElementById('worldMap');
+
+            // Clear existing agents
+            document.querySelectorAll('.agent-marker').forEach(a => a.remove());
+
+            agents = agentData || [];
+            agents.forEach(agent => {
+                const marker = document.createElement('div');
+                marker.className = 'agent-marker';
+
+                // Random position within world bounds for now
+                const x = Math.random() * (worldMap.offsetWidth - 10);
+                const y = Math.random() * (worldMap.offsetHeight - 10);
+
+                marker.style.left = x + 'px';
+                marker.style.top = y + 'px';
+
+                // Add class based on agent state
+                if (agent.status === 'moving') {
+                    marker.classList.add('moving');
+                } else if (agent.status === 'interacting') {
+                    marker.classList.add('interacting');
+                }
+
+                // Tooltip on hover
+                marker.addEventListener('mouseenter', (e) => {
+                    const tooltip = document.getElementById('tooltip');
+                    tooltip.innerHTML = `
+                        Agent: ${agent.id?.substring(0, 8) || 'Unknown'}<br>
+                        Status: ${agent.status || 'idle'}<br>
+                        Balance: ${agent.balance || 0} credits
+                    `;
+                    tooltip.style.display = 'block';
+                    tooltip.style.left = e.pageX + 10 + 'px';
+                    tooltip.style.top = e.pageY + 10 + 'px';
+                });
+
+                marker.addEventListener('mouseleave', () => {
+                    document.getElementById('tooltip').style.display = 'none';
+                });
+
+                worldMap.appendChild(marker);
+            });
+
+            document.getElementById('totalAgents').textContent = agents.length;
+            document.getElementById('popDensity').textContent =
+                (agents.length / districts.length || 0).toFixed(1);
+        }
+
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+
+            ws.onopen = function(event) {
+                console.log('Connected to world map updates');
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                updateWorldMap(data);
+            };
+
+            ws.onclose = function(event) {
+                console.log('Disconnected from world map updates');
+                setTimeout(connectWebSocket, 5000);
+            };
+        }
+
+        function updateWorldMap(data) {
+            if (data.agents?.active) {
+                renderAgents(data.agents.active);
+            }
+
+            // Update district populations if available
+            if (data.world?.districts) {
+                data.world.districts.forEach(district => {
+                    const popElement = document.getElementById(`pop-${district.id}`);
+                    if (popElement) {
+                        popElement.textContent = district.population || 0;
+                    }
+                });
+            }
+
+            // Update activity feed
+            if (data.timestamp) {
+                updateActivityFeed(data);
+            }
+        }
+
+        function updateActivityFeed(data) {
+            const activityDiv = document.getElementById('recentActivity');
+            const activities = [];
+
+            if (data.agents?.active?.length > 0) {
+                activities.push(`${data.agents.active.length} agents active`);
+            }
+
+            if (data.interactions?.total_active_interactions > 0) {
+                activities.push(`${data.interactions.total_active_interactions} interactions ongoing`);
+            }
+
+            if (activities.length > 0) {
+                activityDiv.innerHTML = activities.map(a =>
+                    `<div style="margin-bottom: 5px;">• ${a}</div>`
+                ).join('');
+            }
+        }
+
+        // Control buttons
+        document.getElementById('toggleAgents').addEventListener('click', function() {
+            showAgents = !showAgents;
+            this.classList.toggle('active');
+            if (!showAgents) {
+                document.querySelectorAll('.agent-marker').forEach(a => a.remove());
+            } else {
+                renderAgents(agents);
+            }
+        });
+
+        document.getElementById('toggleConnections').addEventListener('click', function() {
+            showConnections = !showConnections;
+            this.classList.toggle('active');
+            // TODO: Implement connection visualization
+        });
+
+        document.getElementById('autoFollow').addEventListener('click', function() {
+            autoFollow = !autoFollow;
+            this.classList.toggle('active');
+            // TODO: Implement auto-follow for selected agent
+        });
+
+        // Initialize
+        loadDistricts();
+        connectWebSocket();
+
+        // Set initial button states
+        document.getElementById('toggleAgents').classList.add('active');
+    </script>
+</body>
+</html>
