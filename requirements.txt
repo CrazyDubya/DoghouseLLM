@@ -9,7 +9,7 @@ paho-mqtt==1.6.1
 
 # LLM and AI
 openai==1.3.6
-langchain==0.0.340
+langchain==0.2.5
 langchain-openai==0.0.2
 anthropic==0.7.7
 pinecone-client==2.2.4
@@ -19,7 +19,7 @@ sentence-transformers==2.2.2
 google-generativeai==0.3.0  # Gemini
 openai-python==1.3.6  # Grok uses OpenAI-compatible API
 httpx==0.25.2  # For API calls
-aiohttp==3.9.0  # Async HTTP
+aiohttp==3.13.3  # Async HTTP
 
 # GPU and system monitoring
 gputil==1.4.0
@@ -38,21 +38,21 @@ aioredis==2.0.1
 celery==5.3.4
 
 # Security and auth
-cryptography==41.0.7
+cryptography==44.0.1
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
-python-multipart==0.0.6
+python-multipart==0.0.22
 
 # Monitoring and observability
 prometheus-client==0.19.0
 structlog==23.2.0
-sentry-sdk==1.38.0
+sentry-sdk==1.45.1
 
 # Development and testing
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-black==23.11.0
+black==24.3.0
 flake8==6.1.0
 mypy==1.7.1
 
@@ -60,6 +60,6 @@ mypy==1.7.1
 docker==6.1.3
 
 # Web framework extras
-jinja2==3.1.2
+jinja2==3.1.6
 python-dotenv==1.0.0
 httpx==0.25.2
