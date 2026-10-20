@@ -8,8 +8,7 @@ from uuid import UUID
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance, VectorParams, PointStruct,
-    Filter, FieldCondition, MatchValue,
-    SearchRequest, SearchParams
+    Filter, FieldCondition, MatchValue
 )
 from sentence_transformers import SentenceTransformer
 import numpy as np
@@ -150,12 +149,12 @@ class VectorMemoryStore:
                 )
 
             # Search in Qdrant
-            search_result = self.client.search(
+            search_result = self.client.query_points(
                 collection_name=self.collection_name,
-                query_vector=query_embedding,
+                query=query_embedding,
                 query_filter=Filter(must=conditions),
                 limit=limit
-            )
+            ).points
 
             # Convert results to Memory objects
             memories = []
@@ -316,35 +315,31 @@ class VectorMemoryStore:
             embedding = self.embedding_model.encode(memory.content).tolist()
 
             # Search for similar memories (excluding the same memory)
-            search_result = self.client.search(
+            search_result = self.client.query_points(
                 collection_name=self.collection_name,
-                query_vector=embedding,
+                query=embedding,
                 query_filter=Filter(
                     must=[
                         FieldCondition(
                             key="agent_id",
                             match=MatchValue(value=str(memory.agent_id))
                         )
-                    ],
-                    must_not=[
-                        FieldCondition(
-                            key="id",
-                            match=MatchValue(value=str(memory.id))
-                        )
                     ]
                 ),
-                limit=limit,
+                limit=limit + 1,  # extra slot: the memory itself may match
                 score_threshold=min_similarity
-            )
+            ).points
 
             # Convert results
             similar_memories = []
             for hit in search_result:
+                if str(hit.id) == str(memory.id):
+                    continue  # exclude the memory itself
                 similar_memory = self._payload_to_memory(hit.id, hit.payload)
                 if similar_memory:
                     similar_memories.append(similar_memory)
 
-            return similar_memories
+            return similar_memories[:limit]
 
         except Exception as e:
             logger.error(f"Error finding similar memories: {e}")

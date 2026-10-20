@@ -76,9 +76,9 @@ class MemorySystem:
                 "content": memory.content,
                 "importance": memory.importance,
                 "timestamp": memory.timestamp.isoformat(),
-                "participants": [str(p) for p in memory.participants],
-                "emotions": memory.emotions,
-                "tags": memory.tags,
+                "participants": json.dumps([str(p) for p in memory.participants]),
+                "emotions": json.dumps(memory.emotions),
+                "tags": json.dumps(memory.tags),
                 "embedding": json.dumps(embedding)
             }
 
@@ -162,6 +162,7 @@ class MemorySystem:
             similarities = []
 
             for memory_id in memory_ids:
+                memory_id = memory_id.decode() if isinstance(memory_id, bytes) else memory_id
                 memory_data = await self.redis.hgetall(f"memory:{memory_id}")
 
                 if not memory_data:
